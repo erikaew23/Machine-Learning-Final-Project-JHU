@@ -1,0 +1,140 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Practical Machine Learning - Final Project
+### *Erika Eden-Wynter*
+
+### **Background**
+
+#### Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+### **Data**
+
+#### The training data for this project are available here:
+  
+####  https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+#### The test data are available here:
+  
+####  https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+#### The data for this project comes from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+#### The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+
+
+### **Setting Up and Cleaning Data**
+
+```{r}
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(caret)
+library(randomForest)
+library(e1071)
+
+setwd("C:/Users/Erika/Desktop/Machine Learning") 
+```
+
+#### Values "NA", "#DIV/0!", and " " are set to missing values:
+
+```{r}
+trainingset.raw <- read.csv("C:/Users/Erika/Desktop/Machine Learning/pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+testingset.raw <- read.csv("C:/Users/Erika/Desktop/Machine Learning/pml-testing.csv", na.strings=c("NA","#DIV/0!", ""))
+```
+
+#### Columns with said missing values are removed. Also, we notice that the first 6 variables do not show data relevant to our analysis:
+
+```{r}
+set.seed(123)
+
+trainingset <- trainingset.raw[,-c(1:6)]
+testingset <- testingset.raw[,-c(1:6)]
+
+dim(trainingset)
+
+nzvcol <- nearZeroVar(trainingset.raw)
+trainingset <- trainingset[, -nzvcol]
+
+dim(trainingset)
+
+trainingset <- trainingset[,colSums(is.na(trainingset)) == 0]
+testingset <- testingset[,colSums(is.na(testingset)) == 0]
+
+dim(trainingset)
+
+```
+
+#### Creating data partition to split the training set into a training and validation sets (80% and 20%)
+```{r}
+inTrain <- createDataPartition(y = trainingset$classe, p=0.8, list=FALSE)
+
+subTraining <- trainingset[inTrain, ] 
+subTesting <- trainingset[-inTrain, ]
+
+dim(subTraining)
+```
+
+#### We use a 10-fold cross validation to prevent overfitting 
+
+```{r}
+tc <- trainControl(method='cv', number=10)
+```
+
+### *MODEL 1: DECISION TREE*
+
+```{r}
+
+DTmodel <- rpart(classe ~ ., data=subTraining, method="class")
+```
+
+#### Predicting:
+
+```{r}
+DTprediction <- predict(DTmodel, subTesting, type = "class")
+```
+
+#### Plot of the Decision Tree
+
+```{r}
+rpart.plot(DTmodel, main="Decision Tree", extra=102, under=TRUE, faclen=0)
+```
+
+#### Test results on our subTesting data set:
+
+```{r}
+confusionMatrix(DTprediction, subTesting$classe)
+```
+
+### *MODEL 2: RANDOM FOREST*
+
+```{r}
+RFmodel <- randomForest(classe ~. , data=subTraining, method="class")
+```
+
+#### Predicting:
+
+```{r}
+RFprediction <- predict(RFmodel, subTesting, type = "class")
+```
+ 
+#### Test results on subTesting data set:
+
+```{r}
+confusionMatrix(RFprediction, subTesting$classe)
+```
+
+### Comparisson of Decision Tree V.S. Random Forest models
+#### We notice that accuracy for RF is higher with 0.9985 (99.85%) compared to that of the DT, which is at 0.8274 (82.74%)
+
+#### Now that we have chosen our model, we predict the outcomes:
+
+```{r}
+finalPrediction <- predict(RFmodel, testingset, type = "class")
+print(finalPrediction)
+```
